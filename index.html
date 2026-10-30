@@ -1,0 +1,1583 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>Leitor de Crachás & RFID - Prumo Engenharia</title>
+
+  <!-- Bibliotecas Locais (com fallback online automático) -->
+  <script src="html5-qrcode.min.js"></script>
+  <script>
+    if (typeof Html5Qrcode === 'undefined') {
+      document.write('<script src="https://unpkg.com/html5-qrcode@2.3.8/html5-qrcode.min.js"><\/script>');
+    }
+  </script>
+  <script src="xlsx.full.min.js"></script>
+  <script>
+    if (typeof XLSX === 'undefined') {
+      document.write('<script src="https://cdn.sheetjs.com/xlsx-0.20.1/package/dist/xlsx.full.min.js"><\/script>');
+    }
+  </script>
+
+  <!-- Base de Motoristas gerada a partir do Relatório Motoristas.XLS -->
+  <script src="base_motoristas.js" onerror="window.MOTORISTAS_DB = window.MOTORISTAS_DB || {};"></script>
+
+  <style>
+    :root {
+      --bg-main: #f1f5f9;
+      --card-bg: #ffffff;
+      --card-border: #cbd5e1;
+      --header-bg: #0f172a;
+      --primary: #2563eb;
+      --primary-hover: #1d4ed8;
+      --success: #16a34a;
+      --success-hover: #15803d;
+      --excel-btn: #059669;
+      --excel-btn-hover: #047857;
+      --warning: #d97706;
+      --danger: #dc2626;
+      --danger-hover: #b91c1c;
+      --text-main: #0f172a;
+      --text-muted: #64748b;
+      --highlight-bg: #eff6ff;
+      --highlight-border: #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; font-family: 'Segoe UI', system-ui, -apple-system, sans-serif; }
+    
+    html, body {
+      height: 100vh;
+      max-height: 100vh;
+      margin: 0;
+      padding: 0;
+      overflow: hidden !important;
+      background-color: var(--bg-main);
+      color: var(--text-main);
+      display: flex;
+      flex-direction: column;
+    }
+
+    /* Barra Superior Compacta */
+    header {
+      background: var(--header-bg);
+      color: #ffffff;
+      padding: 0 18px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      box-shadow: 0 2px 6px rgba(0,0,0,0.15);
+      flex-shrink: 0;
+      height: 48px;
+      min-height: 48px;
+      z-index: 10;
+    }
+    header h1 { font-size: 1.1rem; font-weight: 700; letter-spacing: -0.02em; }
+    .header-info { display: flex; align-items: center; gap: 12px; font-size: 0.85rem; color: #94a3b8; }
+    .badge-info { background: #1e293b; color: #cbd5e1; padding: 4px 10px; border-radius: 6px; font-weight: 600; font-size: 0.8rem; border: 1px solid #334155; }
+
+    /* Layout Horizontal em 3 Colunas (Sem rolagem vertical em 1920x1080) */
+    .main-layout {
+      display: grid;
+      grid-template-columns: 310px 370px 1fr;
+      gap: 12px;
+      padding: 10px 16px;
+      flex: 1;
+      min-height: 0;
+      height: calc(100vh - 48px);
+      max-height: calc(100vh - 48px);
+      box-sizing: border-box;
+      overflow: hidden !important;
+    }
+
+    @media (max-width: 950px) {
+      html, body { overflow: auto !important; height: auto !important; }
+      .main-layout {
+        display: flex;
+        flex-direction: column;
+        height: auto;
+        max-height: none;
+        overflow: visible !important;
+      }
+      .col-table { min-height: 500px; }
+    }
+
+    .column {
+      display: flex;
+      flex-direction: column;
+      gap: 10px;
+      height: 100%;
+      min-height: 0;
+      overflow: hidden;
+    }
+
+    /* Cards */
+    .card {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      box-shadow: 0 1px 3px rgba(0,0,0,0.05);
+    }
+    .card-title {
+      font-size: 0.88rem;
+      font-weight: 700;
+      color: var(--text-main);
+      margin-bottom: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+    }
+
+    /* Seção da Câmera (Espelhada e Compacta) */
+    #qr-reader-container {
+      background: #000;
+      border-radius: 8px;
+      overflow: hidden;
+      height: 175px;
+      min-height: 175px;
+      max-height: 175px;
+      position: relative;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+    }
+    #qr-reader {
+      width: 100% !important;
+      border: none !important;
+      height: 100% !important;
+    }
+    #qr-reader__scan_region {
+      background: transparent !important;
+      height: 100% !important;
+    }
+    #qr-reader canvas {
+      display: none !important;
+    }
+    /* Espelha a imagem da câmera horizontalmente (efeito espelho) */
+    #qr-reader video {
+      border-radius: 8px;
+      object-fit: cover;
+      transform: scaleX(-1);
+      -webkit-transform: scaleX(-1);
+      width: 100% !important;
+      height: 175px !important;
+      max-height: 175px !important;
+      filter: contrast(1.04) brightness(1.02);
+    }
+    #qr-reader__dashboard { display: none !important; }
+
+    /* Retículo / Mira Visual Central (Orientação limpa sem cortar o quadro do sensor) */
+    .camera-reticle {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 105px;
+      height: 105px;
+      transform: translate(-50%, -50%);
+      pointer-events: none;
+      z-index: 8;
+      box-sizing: border-box;
+      transition: all 0.25s ease;
+    }
+    .reticle-corner {
+      position: absolute;
+      width: 16px;
+      height: 16px;
+      border-color: rgba(56, 189, 248, 0.9);
+      border-style: solid;
+      border-width: 0;
+      transition: all 0.2s ease;
+    }
+    .reticle-corner.tl { top: 0; left: 0; border-top-width: 3px; border-left-width: 3px; border-top-left-radius: 4px; }
+    .reticle-corner.tr { top: 0; right: 0; border-top-width: 3px; border-right-width: 3px; border-top-right-radius: 4px; }
+    .reticle-corner.bl { bottom: 0; left: 0; border-bottom-width: 3px; border-left-width: 3px; border-bottom-left-radius: 4px; }
+    .reticle-corner.br { bottom: 0; right: 0; border-bottom-width: 3px; border-right-width: 3px; border-bottom-right-radius: 4px; }
+
+    .reticle-crosshair {
+      position: absolute;
+      top: 50%;
+      left: 50%;
+      width: 8px;
+      height: 8px;
+      transform: translate(-50%, -50%);
+      border-radius: 50%;
+      background: rgba(56, 189, 248, 0.45);
+      box-shadow: 0 0 6px rgba(56, 189, 248, 0.7);
+      transition: all 0.2s ease;
+    }
+
+    /* Feedback visual ao detectar QR Code com sucesso */
+    .camera-reticle.reticle-success {
+      transform: translate(-50%, -50%) scale(1.08);
+    }
+    .camera-reticle.reticle-success .reticle-corner {
+      border-color: #22c55e !important;
+      box-shadow: 0 0 12px rgba(34, 197, 94, 0.9);
+    }
+    .camera-reticle.reticle-success .reticle-crosshair {
+      background: #22c55e !important;
+      transform: translate(-50%, -50%) scale(1.6);
+      box-shadow: 0 0 14px rgba(34, 197, 94, 1);
+    }
+
+    .cam-controls { display: flex; align-items: center; gap: 6px; margin-top: 8px; }
+    select, input[type="text"] {
+      padding: 7px 9px;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      font-size: 0.85rem;
+      outline: none;
+    }
+    select:focus, input[type="text"]:focus { border-color: var(--primary); }
+
+    /* Botões */
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      justify-content: center;
+      gap: 6px;
+      padding: 7px 12px;
+      font-size: 0.85rem;
+      font-weight: 600;
+      border-radius: 6px;
+      border: none;
+      cursor: pointer;
+      transition: all 0.15s ease-in-out;
+      text-decoration: none;
+      white-space: nowrap;
+    }
+    .btn-sm { padding: 5px 8px; font-size: 0.78rem; }
+    .btn-primary { background: var(--primary); color: white; }
+    .btn-primary:hover { background: var(--primary-hover); }
+    .btn-success { background: var(--success); color: white; }
+    .btn-success:hover { background: var(--success-hover); }
+    .btn-excel { background: var(--excel-btn); color: white; }
+    .btn-excel:hover { background: var(--excel-btn-hover); }
+    .btn-secondary { background: #e2e8f0; color: #1e293b; }
+    .btn-secondary:hover { background: #cbd5e1; }
+    .btn-danger { background: #fee2e2; color: #b91c1c; }
+    .btn-danger:hover { background: #fecaca; }
+
+    /* Status Badges */
+    .status-badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 5px;
+      font-size: 0.75rem;
+      font-weight: 700;
+      padding: 2px 7px;
+      border-radius: 9999px;
+    }
+    .status-active { color: var(--success); background: #dcfce7; }
+    .status-inactive { color: var(--danger); background: #fee2e2; }
+    .status-warning { color: var(--warning); background: #fef3c7; }
+
+    /* Card de Leitura Atual (Staging Compacto) */
+    .card-staging {
+      background: var(--highlight-bg);
+      border: 2px solid var(--highlight-border);
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+      padding: 10px 12px;
+    }
+    .auto-confirm-toggle {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      font-size: 0.78rem;
+      font-weight: 700;
+      color: #047857;
+      cursor: pointer;
+      user-select: none;
+      background: #ecfdf5;
+      padding: 3px 8px;
+      border-radius: 9999px;
+      border: 1px solid #a7f3d0;
+      transition: all 0.2s;
+    }
+    .auto-confirm-toggle:hover {
+      background: #d1fae5;
+    }
+    .auto-confirm-toggle input[type="checkbox"] {
+      cursor: pointer;
+      width: 14px;
+      height: 14px;
+      accent-color: #059669;
+    }
+    .instruction-banner {
+      background: #dbeafe;
+      color: #1e40af;
+      padding: 6px 9px;
+      border-radius: 6px;
+      font-size: 0.82rem;
+      font-weight: 700;
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      transition: all 0.2s;
+    }
+    .instruction-banner.ready { background: #dcfce7; color: #15803d; }
+    .instruction-banner.waiting { background: #fef3c7; color: #b45309; }
+
+    .fields-grid { display: flex; flex-direction: column; gap: 5px; }
+    .field-row { display: grid; grid-template-columns: 110px 1fr; align-items: center; gap: 6px; }
+    .field-label { font-size: 0.78rem; font-weight: 700; color: #334155; }
+    .field-input { width: 100%; font-size: 0.85rem; font-weight: 600; padding: 5px 8px; }
+    .field-input.mono { font-family: monospace; font-size: 0.9rem; }
+
+    .staging-buttons { display: flex; gap: 5px; }
+    .btn-confirm-main {
+      width: 100%;
+      padding: 9px;
+      font-size: 0.9rem;
+      font-weight: 700;
+      letter-spacing: 0.02em;
+    }
+
+    /* Card de Resumo do Último Cartão / Atalhos */
+    .card-summary {
+      background: var(--card-bg);
+      border: 1px solid var(--card-border);
+      border-radius: 10px;
+      padding: 10px 12px;
+      display: flex;
+      flex-direction: column;
+      gap: 6px;
+      flex: 1;
+      min-height: 0;
+      overflow: hidden;
+    }
+    .last-card-preview {
+      background: #f8fafc;
+      border: 1px dashed var(--card-border);
+      border-radius: 6px;
+      padding: 6px 10px;
+      font-size: 0.8rem;
+      display: flex;
+      flex-direction: column;
+      gap: 3px;
+    }
+    .shortcut-pills {
+      display: flex;
+      flex-wrap: wrap;
+      gap: 4px;
+      margin-top: 4px;
+    }
+    .shortcut-pill {
+      font-size: 0.72rem;
+      padding: 2px 6px;
+      background: #f1f5f9;
+      border: 1px solid #e2e8f0;
+      border-radius: 4px;
+      color: #475569;
+      font-weight: 600;
+    }
+
+    /* Coluna da Tabela (100% contida e com rolagem vertical suave) */
+    .col-table {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .table-card {
+      height: 100%;
+      min-height: 0;
+      display: flex;
+      flex-direction: column;
+      padding: 10px 14px;
+      box-sizing: border-box;
+      overflow: hidden;
+    }
+    .table-header-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 8px;
+      flex-shrink: 0;
+    }
+    .table-container {
+      flex: 1 1 0px;
+      min-height: 0;
+      overflow-y: scroll;
+      overflow-x: auto;
+      border: 1px solid var(--card-border);
+      border-radius: 6px;
+      background: #ffffff;
+    }
+    .table-container::-webkit-scrollbar {
+      width: 9px;
+      height: 9px;
+    }
+    .table-container::-webkit-scrollbar-track {
+      background: #f8fafc;
+      border-radius: 4px;
+    }
+    .table-container::-webkit-scrollbar-thumb {
+      background: #cbd5e1;
+      border-radius: 4px;
+    }
+    .table-container::-webkit-scrollbar-thumb:hover {
+      background: #94a3b8;
+    }
+
+    table { width: 100%; border-collapse: collapse; font-size: 0.86rem; }
+    th {
+      background: #f8fafc;
+      color: #475569;
+      font-weight: 700;
+      padding: 8px 10px;
+      text-align: left;
+      border-bottom: 2px solid var(--card-border);
+      position: sticky;
+      top: 0;
+      z-index: 2;
+      box-shadow: 0 1px 2px rgba(0,0,0,0.05);
+    }
+    td { padding: 6px 10px; border-bottom: 1px solid #e2e8f0; color: #1e293b; }
+    tr:hover { background-color: #f8fafc; }
+    tr.latest-row { background-color: #ecfdf5; animation: highlightFade 1.8s ease-out; }
+
+    @keyframes highlightFade {
+      0% { background-color: #a7f3d0; }
+      100% { background-color: #ecfdf5; }
+    }
+
+    .table-footer-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-top: 6px;
+      padding-top: 4px;
+      flex-shrink: 0;
+    }
+
+    /* Modal de Edição */
+    .modal-overlay {
+      position: fixed;
+      top: 0; left: 0; right: 0; bottom: 0;
+      background: rgba(0,0,0,0.5);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 100;
+      opacity: 0;
+      pointer-events: none;
+      transition: opacity 0.2s;
+    }
+    .modal-overlay.open { opacity: 1; pointer-events: auto; }
+    .modal-box {
+      background: white;
+      border-radius: 10px;
+      width: 420px;
+      padding: 18px;
+      box-shadow: 0 10px 25px rgba(0,0,0,0.2);
+    }
+    .modal-box h3 { margin-bottom: 12px; font-size: 1.05rem; color: var(--text-main); }
+    .modal-actions { display: flex; justify-content: flex-end; gap: 8px; margin-top: 14px; }
+
+    /* Toast Notification */
+    .toast {
+      position: fixed;
+      bottom: 20px;
+      right: 20px;
+      background: #0f172a;
+      color: white;
+      padding: 10px 16px;
+      border-radius: 8px;
+      font-weight: 600;
+      font-size: 0.9rem;
+      box-shadow: 0 4px 12px rgba(0,0,0,0.25);
+      opacity: 0;
+      transform: translateY(12px);
+      transition: all 0.25s;
+      z-index: 200;
+    }
+    .toast.show { opacity: 1; transform: translateY(0); }
+    .toast.success { background: var(--success); }
+    .toast.error { background: var(--danger); }
+  </style>
+</head>
+<body>
+
+  <!-- BARRA SUPERIOR -->
+  <header>
+    <h1>Controle & Gravação de Crachás RFID</h1>
+    <div class="header-info">
+      <span id="reportInfo" class="badge-info">📄 Relatório Motoristas.XLS</span>
+      <input type="file" id="excelFileInput" accept=".xls,.xlsx,.csv" style="display: none;" onchange="handleExcelUpload(event)">
+      <button class="btn btn-sm btn-secondary" onclick="document.getElementById('excelFileInput').click()">📂 Trocar Relatório</button>
+    </div>
+  </header>
+
+  <!-- CONTEÚDO PRINCIPAL (3 COLUNAS HORIZONTAIS) -->
+  <main class="main-layout">
+
+    <!-- COLUNA 1: CÂMERA (ESPELHADA) E RFID USB -->
+    <div class="column">
+
+      <!-- CARD 1: CÂMERA -->
+      <div class="card">
+        <div class="card-title">
+          <span>📷 Câmera (Espelho)</span>
+          <span id="camStatusBadge" class="status-badge status-inactive">● Inativa</span>
+        </div>
+
+        <div id="qr-reader-container">
+          <div id="qr-reader"></div>
+          <div class="camera-reticle" id="cameraReticle" title="Mantenha o QR Code em frente à câmera">
+            <div class="reticle-corner tl"></div>
+            <div class="reticle-corner tr"></div>
+            <div class="reticle-corner bl"></div>
+            <div class="reticle-corner br"></div>
+            <div class="reticle-crosshair"></div>
+          </div>
+        </div>
+
+        <div class="cam-controls">
+          <select id="cameraSelect" style="flex: 1;">
+            <option value="">Câmera Padrão</option>
+          </select>
+          <button id="btnToggleCam" class="btn btn-sm btn-primary" onclick="toggleCamera()">Iniciar</button>
+        </div>
+      </div>
+
+      <!-- CARD 2: LEITOR RFID USB -->
+      <div class="card">
+        <div class="card-title">
+          <span>💳 Leitor RFID USB (J-M15)</span>
+          <span id="rfidStatusBadge" class="status-badge status-inactive">● Desconectado</span>
+        </div>
+
+        <div style="display: flex; gap: 8px; align-items: center; justify-content: space-between;">
+          <button id="btnConnectRFID" class="btn btn-sm btn-primary" onclick="toggleRFIDConnection()">
+            🔌 Conectar USB
+          </button>
+          <span id="rfidDeviceInfo" style="font-size: 0.8rem; color: var(--text-muted); text-align: right; overflow: hidden; text-overflow: ellipsis; white-space: nowrap;">Aguardando conexão...</span>
+        </div>
+      </div>
+
+    </div>
+
+    <!-- COLUNA 2: LEITURA ATUAL DO CARTÃO (STAGING) + RESUMO -->
+    <div class="column">
+      <!-- CARD 1: FORMULÁRIO COMPACTO -->
+      <div class="card card-staging">
+        <div class="card-title" style="color: var(--primary); display: flex; justify-content: space-between; align-items: center;">
+          <span>⚡ Leitura Atual do Cartão</span>
+          <label class="auto-confirm-toggle" title="Confirma e passa para o próximo cartão automaticamente ao ler QR e RFID">
+            <input type="checkbox" id="chkAutoConfirm" checked>
+            <span>Auto-confirmar</span>
+          </label>
+        </div>
+
+        <!-- Banner de Orientação -->
+        <div id="instructionBanner" class="instruction-banner">
+          1. Aproxime o QR Code do crachá na câmera...
+        </div>
+
+        <!-- Campos de Dados -->
+        <div class="fields-grid">
+          <div class="field-row">
+            <label class="field-label">Matrícula (QR):</label>
+            <input type="text" id="inputMatricula" class="field-input mono" placeholder="Ex: 31919" oninput="onManualMatriculaInput()">
+          </div>
+
+          <div class="field-row">
+            <label class="field-label">Nome Motorista:</label>
+            <input type="text" id="inputNome" class="field-input" placeholder="Preenchimento automático">
+          </div>
+
+          <div class="field-row">
+            <label class="field-label">Código RFID:</label>
+            <input type="text" id="inputRFID" class="field-input mono" placeholder="Aproxime o cartão no leitor..." oninput="onManualRFIDInput()">
+          </div>
+        </div>
+
+        <!-- Botões de Re-leitura -->
+        <div class="staging-buttons">
+          <button class="btn btn-sm btn-secondary" style="flex: 1;" onclick="rereadQR()">🔄 QR (F2)</button>
+          <button class="btn btn-sm btn-secondary" style="flex: 1;" onclick="rereadRFID()">🔄 RFID (F3)</button>
+          <button class="btn btn-sm btn-danger" onclick="clearStage()">❌ Limpar (Esc)</button>
+        </div>
+
+        <!-- Botão Principal de Confirmação (Logo abaixo dos campos, sem gap gigante!) -->
+        <button id="btnConfirmCard" class="btn btn-success btn-confirm-main" onclick="confirmCard()">
+          ✅ CONFIRMAR CARTÃO (Espaço)
+        </button>
+      </div>
+
+      <!-- CARD 2: ÚLTIMO CARTÃO CADASTRADO & ATALHOS -->
+      <div class="card card-summary">
+        <div class="card-title" style="font-size: 0.85rem; color: #475569; margin-bottom: 4px;">
+          <span>📌 Último Cartão Gravado</span>
+          <span id="lastCardBadge" style="font-size: 0.72rem; color: var(--text-muted); font-weight: 600;">-</span>
+        </div>
+
+        <div class="last-card-preview" id="lastCardPreview">
+          <div><strong style="color: var(--text-muted);">RFID:</strong> <span id="lastPreviewRFID" style="font-family: monospace; font-weight: 700; color: #0284c7;">-</span></div>
+          <div><strong style="color: var(--text-muted);">Matrícula:</strong> <span id="lastPreviewMat" style="font-family: monospace; font-weight: 700;">-</span></div>
+          <div><strong style="color: var(--text-muted);">Nome:</strong> <span id="lastPreviewNome" style="font-weight: 600;">(Nenhum cartão cadastrado ainda)</span></div>
+        </div>
+
+        <div style="margin-top: auto; padding-top: 6px;">
+          <div style="font-size: 0.75rem; font-weight: 700; color: var(--text-muted); margin-bottom: 3px;">Atalhos de Teclado:</div>
+          <div class="shortcut-pills">
+            <span class="shortcut-pill"><b>Espaço</b> Confirmar</span>
+            <span class="shortcut-pill"><b>Ctrl+C</b> Copiar</span>
+            <span class="shortcut-pill"><b>F2</b> Reler QR</span>
+            <span class="shortcut-pill"><b>F3</b> Reler RFID</span>
+            <span class="shortcut-pill"><b>Esc</b> Limpar</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- COLUNA 3: LISTA DE CARTÕES ASSOCIADOS -->
+    <div class="col-table">
+      <div class="card table-card">
+        <div class="table-header-bar">
+          <div>
+            <h2 style="font-size: 1rem; font-weight: 700;">📋 Lista de Cartões Associados</h2>
+            <span id="cardCountLabel" style="font-size: 0.8rem; color: var(--text-muted); font-weight: 600;">Total: 0 cartões</span>
+          </div>
+
+          <div style="display: flex; gap: 8px;">
+            <button class="btn btn-excel btn-sm" onclick="copyToExcel()">
+              📋 Copiar para Excel (Ctrl+C)
+            </button>
+            <button class="btn btn-primary btn-sm" onclick="exportExcelFile()">
+              💾 Baixar .xlsx
+            </button>
+          </div>
+        </div>
+
+        <!-- Tabela com rolagem interna -->
+        <div class="table-container">
+          <table>
+            <thead>
+              <tr>
+                <th style="width: 160px;">Código Cartão (RFID)</th>
+                <th style="width: 110px;">Matrícula</th>
+                <th>Nome do Motorista</th>
+                <th style="width: 80px; text-align: center;">Horário</th>
+                <th style="width: 100px; text-align: center;">Ações</th>
+              </tr>
+            </thead>
+            <tbody id="cardsTableBody">
+              <!-- Linhas geradas via JavaScript -->
+            </tbody>
+          </table>
+        </div>
+
+        <!-- Barra Inferior da Tabela -->
+        <div class="table-footer-bar">
+          <button class="btn btn-sm btn-danger" onclick="clearAllCards()">🧹 Limpar Lista</button>
+
+          <label style="display: flex; align-items: center; gap: 6px; font-size: 0.85rem; cursor: pointer;">
+            <input type="checkbox" id="soundToggle" checked>
+            <span>🔊 Sons de Alerta</span>
+          </label>
+        </div>
+
+      </div>
+    </div>
+
+  </main>
+
+  <!-- MODAL DE EDIÇÃO -->
+  <div id="editModal" class="modal-overlay">
+    <div class="modal-box">
+      <h3>✏️ Editar Cartão</h3>
+      <input type="hidden" id="editCardIndex">
+
+      <div class="fields-grid">
+        <div class="field-row">
+          <label class="field-label">Código RFID:</label>
+          <input type="text" id="editRFID" class="field-input mono">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Matrícula:</label>
+          <input type="text" id="editMatricula" class="field-input mono">
+        </div>
+        <div class="field-row">
+          <label class="field-label">Nome:</label>
+          <input type="text" id="editNome" class="field-input">
+        </div>
+      </div>
+
+      <div class="modal-actions">
+        <button class="btn btn-secondary" onclick="closeEditModal()">Cancelar</button>
+        <button class="btn btn-success" onclick="saveEditCard()">Salvar Alterações</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- TOAST DE NOTIFICAÇÃO -->
+  <div id="toastNotification" class="toast">Mensagem</div>
+
+  <!-- SCRIPTS 100% STANDALONE NO NAVEGADOR -->
+  <script>
+    // Função auxiliar para remover zeros à esquerda da matrícula
+    function stripLeadingZeros(val) {
+      if (val === null || val === undefined) return "";
+      const s = String(val).trim();
+      const stripped = s.replace(/^0+/, '');
+      return stripped === "" ? (s === "" ? "" : "0") : stripped;
+    }
+
+    // 1. BASE DE MOTORISTAS (Carregada de base_motoristas.js ou customizada)
+    let employeeDB = window.MOTORISTAS_DB || {};
+    let customDB = JSON.parse(localStorage.getItem('custom_employees_db')) || null;
+    if (customDB) employeeDB = customDB;
+
+    // 2. HISTÓRICO DE CARTÕES (Persistido no localStorage)
+    let cards = JSON.parse(localStorage.getItem('crachas_cards_history')) || [];
+    // Higieniza registros existentes para remover zeros à esquerda
+    cards.forEach(c => {
+      c.matricula = stripLeadingZeros(c.matricula);
+    });
+
+    // Câmera & Scanner
+    let html5QrCode = null;
+    let isCameraRunning = false;
+    let isScanningPaused = false;
+    let lastScannedQR = "";
+    let lastScannedQRTime = 0;
+
+    // Leitor RFID (Web Serial)
+    let rfidPort = null;
+    let rfidReader = null;
+    let rfidWriter = null;
+    let isRFIDConnected = false;
+    let rfidBuffer = "";
+    let lastRFIDTag = "";
+    let lastRFIDTime = 0;
+
+    // Elementos DOM
+    const reportInfo = document.getElementById('reportInfo');
+    const camStatusBadge = document.getElementById('camStatusBadge');
+    const cameraSelect = document.getElementById('cameraSelect');
+    const btnToggleCam = document.getElementById('btnToggleCam');
+    const rfidStatusBadge = document.getElementById('rfidStatusBadge');
+    const btnConnectRFID = document.getElementById('btnConnectRFID');
+    const rfidDeviceInfo = document.getElementById('rfidDeviceInfo');
+    const instructionBanner = document.getElementById('instructionBanner');
+    const inputMatricula = document.getElementById('inputMatricula');
+    const inputNome = document.getElementById('inputNome');
+    const inputRFID = document.getElementById('inputRFID');
+    const cardsTableBody = document.getElementById('cardsTableBody');
+    const cardCountLabel = document.getElementById('cardCountLabel');
+    const soundToggle = document.getElementById('soundToggle');
+    const chkAutoConfirm = document.getElementById('chkAutoConfirm');
+
+    // Auto-confirmar (Padrão: ATIVADO)
+    const savedAutoConfirm = localStorage.getItem('crachas_auto_confirm');
+    chkAutoConfirm.checked = (savedAutoConfirm !== null) ? (savedAutoConfirm === 'true') : true;
+
+    chkAutoConfirm.addEventListener('change', () => {
+      localStorage.setItem('crachas_auto_confirm', chkAutoConfirm.checked);
+      updateBannerState();
+      checkAutoConfirm();
+    });
+
+    // SINTETIZADOR DE ÁUDIO NATIVO (Web Audio API)
+    const audioCtx = new (window.AudioContext || window.webkitAudioContext)();
+    function playBeep(freq, type, duration) {
+      if (!soundToggle.checked) return;
+      if (audioCtx.state === 'suspended') audioCtx.resume();
+      const osc = audioCtx.createOscillator();
+      const gain = audioCtx.createGain();
+      osc.type = type || 'sine';
+      osc.frequency.value = freq;
+      osc.connect(gain);
+      gain.connect(audioCtx.destination);
+      osc.start();
+      gain.gain.exponentialRampToValueAtTime(0.00001, audioCtx.currentTime + duration);
+      osc.stop(audioCtx.currentTime + duration);
+    }
+
+    function beepQR() { playBeep(920, 'sine', 0.12); }
+    function beepRFID() { playBeep(1400, 'sine', 0.14); }
+    function beepConfirm() {
+      playBeep(880, 'triangle', 0.08);
+      setTimeout(() => playBeep(1320, 'triangle', 0.14), 90);
+    }
+
+    // BUSCA DE NOME POR MATRÍCULA
+    function findEmployeeName(mat) {
+      if (!mat) return "";
+      const clean = mat.trim();
+      if (employeeDB[clean]) return employeeDB[clean];
+      const stripped = clean.replace(/^0+/, '');
+      if (employeeDB[stripped]) return employeeDB[stripped];
+      const padded = clean.padStart(6, '0');
+      if (employeeDB[padded]) return employeeDB[padded];
+      return "";
+    }
+
+    function onManualMatriculaInput() {
+      const mat = inputMatricula.value.trim();
+      const cleanMat = stripLeadingZeros(mat);
+      if (mat) {
+        const nome = findEmployeeName(cleanMat) || findEmployeeName(mat);
+        if (nome) {
+          inputNome.value = nome;
+        } else {
+          inputNome.value = "(Não encontrado no relatório)";
+        }
+      }
+      updateBannerState();
+      checkAutoConfirm();
+    }
+
+    inputMatricula.addEventListener('blur', () => {
+      if (inputMatricula.value) {
+        inputMatricula.value = stripLeadingZeros(inputMatricula.value);
+      }
+    });
+
+    function onManualRFIDInput() {
+      updateBannerState();
+      checkAutoConfirm();
+    }
+
+    function updateReportBadge() {
+      const count = Object.keys(employeeDB).length;
+      if (count > 0) {
+        reportInfo.textContent = `📄 Relatório (${count.toLocaleString('pt-BR')} motoristas)`;
+      } else {
+        reportInfo.textContent = `📂 Nenhuma Planilha Carregada`;
+      }
+    }
+
+    // CARREGAR OUTRA PLANILHA .XLS, .XLSX OU .CSV COM SHEETJS
+    function handleExcelUpload(event) {
+      const file = event.target.files[0];
+      if (!file) return;
+
+      const reader = new FileReader();
+      reader.onload = function(e) {
+        try {
+          const data = new Uint8Array(e.target.result);
+          const workbook = XLSX.read(data, { type: 'array' });
+          const firstSheet = workbook.Sheets[workbook.SheetNames[0]];
+          const rows = XLSX.utils.sheet_to_json(firstSheet, { header: 1 });
+
+          if (!rows || rows.length < 2) {
+            alert("A planilha selecionada está vazia.");
+            return;
+          }
+
+          const header = rows[0].map(c => String(c || '').trim().toUpperCase());
+          let chapaCol = -1, nomeCol = -1;
+
+          header.forEach((col, idx) => {
+            if (['CHAPA', 'MATRICULA', 'MATRÍCULA', 'ID'].includes(col)) chapaCol = idx;
+            if (['NOME', 'FUNCIONARIO', 'FUNCIONÁRIO', 'MOTORISTA'].includes(col)) nomeCol = idx;
+          });
+
+          if (chapaCol === -1) chapaCol = 3;
+          if (nomeCol === -1) nomeCol = 4;
+
+          const newDB = {};
+          for (let r = 1; r < rows.length; r++) {
+            const row = rows[r];
+            if (!row || row.length <= Math.max(chapaCol, nomeCol)) continue;
+
+            let cVal = String(row[chapaCol] || '').trim();
+            if (cVal.endsWith('.0')) cVal = cVal.slice(0, -2);
+            const nVal = String(row[nomeCol] || '').trim();
+
+            if (cVal && nVal) {
+              newDB[cVal] = nVal;
+              newDB[cVal.replace(/^0+/, '')] = nVal;
+              newDB[cVal.padStart(6, '0')] = nVal;
+            }
+          }
+
+          employeeDB = newDB;
+          localStorage.setItem('custom_employees_db', JSON.stringify(newDB));
+          updateReportBadge();
+          showToast(`✓ Planilha carregada! ${Object.keys(newDB).length} motoristas`, "success");
+        } catch (err) {
+          console.error("Erro ao processar planilha:", err);
+          alert("Erro ao ler a planilha: " + err.message);
+        }
+      };
+      reader.readAsArrayBuffer(file);
+    }
+
+    // PERSISTÊNCIA DE CARTÕES
+    function saveCards() {
+      localStorage.setItem('crachas_cards_history', JSON.stringify(cards));
+    }
+
+    function updateLastCardPreview() {
+      const pRFID = document.getElementById('lastPreviewRFID');
+      const pMat = document.getElementById('lastPreviewMat');
+      const pNome = document.getElementById('lastPreviewNome');
+      const pBadge = document.getElementById('lastCardBadge');
+      if (!pRFID) return;
+
+      if (cards.length > 0) {
+        const c = cards[0];
+        pRFID.textContent = c.codigo || '-';
+        pMat.textContent = stripLeadingZeros(c.matricula) || '-';
+        pNome.textContent = c.nome || '-';
+        pBadge.textContent = c.hora ? `Às ${c.hora}` : '';
+      } else {
+        pRFID.textContent = '-';
+        pMat.textContent = '-';
+        pNome.textContent = '(Nenhum cartão gravado ainda)';
+        pBadge.textContent = '-';
+      }
+    }
+
+    // RENDERIZAÇÃO DA TABELA (Último lido sempre na primeira linha)
+    function renderCardsTable(highlightFirst = false) {
+      cardsTableBody.innerHTML = '';
+      cards.forEach((card, idx) => {
+        const tr = document.createElement('tr');
+        if (highlightFirst && idx === 0) tr.classList.add('latest-row');
+
+        const cleanMat = stripLeadingZeros(card.matricula);
+        tr.innerHTML = `
+          <td style="font-family: monospace; font-weight: 700; color: #0284c7;">${card.codigo || '-'}</td>
+          <td style="font-family: monospace; font-weight: 700;">${cleanMat || '-'}</td>
+          <td style="font-weight: 600;">${card.nome || '-'}</td>
+          <td style="text-align: center; color: var(--text-muted); font-size: 0.82rem;">${card.hora || '-'}</td>
+          <td style="text-align: center;">
+            <button class="btn btn-sm btn-secondary" onclick="openEditModal(${idx})" title="Editar">✏️</button>
+            <button class="btn btn-sm btn-danger" onclick="deleteCard(${idx})" title="Excluir">🗑️</button>
+          </td>
+        `;
+        cardsTableBody.appendChild(tr);
+      });
+      cardCountLabel.textContent = `Total: ${cards.length} cartões`;
+      updateLastCardPreview();
+    }
+
+    // 📷 MÓDULO DA CÂMERA (ESPELHADA E QUADRO COMPACTO)
+    async function refreshCameraList() {
+      try {
+        const devices = await Html5Qrcode.getCameras();
+        if (devices && devices.length > 0) {
+          const currentVal = cameraSelect.value;
+          cameraSelect.innerHTML = '';
+          devices.forEach((dev, idx) => {
+            const opt = document.createElement('option');
+            opt.value = dev.id;
+            opt.textContent = dev.label || `Câmera ${idx + 1}`;
+            if (dev.id === currentVal) opt.selected = true;
+            cameraSelect.appendChild(opt);
+          });
+          return true;
+        }
+      } catch (err) {
+        console.warn("Aviso ao enumerar câmeras:", err);
+      }
+      return false;
+    }
+
+    async function startCamera(preferredCameraId) {
+      camStatusBadge.className = "status-badge status-warning";
+      camStatusBadge.textContent = "● Conectando...";
+
+      try {
+        // Se já houver câmera rodando, para antes de reiniciar
+        if (html5QrCode && isCameraRunning) {
+          try {
+            await html5QrCode.stop();
+          } catch (_) {}
+          isCameraRunning = false;
+        }
+
+        // Garante instância otimizada do Html5Qrcode
+        // Ativa aceleração de hardware nativa (BarcodeDetector no Chrome/Edge) e restringe para QR Code apenas
+        if (!html5QrCode) {
+          const formatsToSupport = (typeof Html5QrcodeSupportedFormats !== 'undefined')
+            ? [ Html5QrcodeSupportedFormats.QR_CODE ]
+            : [ 0 ];
+
+          html5QrCode = new Html5Qrcode("qr-reader", {
+            formatsToSupport: formatsToSupport,
+            experimentalFeatures: {
+              useBarCodeDetectorIfSupported: true
+            },
+            verbose: false
+          });
+        }
+
+        // Define a câmera de destino:
+        // Se o usuário selecionou uma câmera no select (ou se foi passada explicitamente), usa o ID.
+        // Se estiver vazio ou "Câmera Padrão", usa { facingMode: "user" } para abrir a câmera frontal padrão
+        const selectedId = preferredCameraId || cameraSelect.value;
+        const cameraConfig = (selectedId && selectedId.trim() !== "")
+          ? selectedId
+          : { facingMode: "user" };
+
+        // Otimização de Leitura para Câmeras de Notebook:
+        // 1. Omitimos qrbox para que o algoritmo analise o quadro INTEIRO (100% da área),
+        //    eliminando o problema de corte onde os marcadores de canto do QR ficavam fora da mira de 100px.
+        // 2. Solicitamos resolução HD 720p (ideal: 1280x720) para máxima nitidez das linhas do código.
+        // 3. FPS a 25 quadros/segundo para leitura instantânea ao posicionar o crachá.
+        const config = {
+          fps: 25,
+          videoConstraints: (selectedId && selectedId.trim() !== "")
+            ? {
+                deviceId: { exact: selectedId },
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 }
+              }
+            : {
+                facingMode: "user",
+                width: { ideal: 1280, min: 640 },
+                height: { ideal: 720, min: 480 }
+              }
+        };
+
+        // Inicia a captura de vídeo e leitura contínua
+        await html5QrCode.start(
+          cameraConfig,
+          config,
+          onQRCodeDetected,
+          () => {} // callback vazio frame a frame sem QR (obrigatório para evitar exceções não tratadas)
+        );
+
+        isCameraRunning = true;
+        camStatusBadge.className = "status-badge status-active";
+        camStatusBadge.textContent = "● Câmera Ativa";
+        btnToggleCam.textContent = "Parar";
+        btnToggleCam.className = "btn btn-sm btn-danger";
+
+        // Com o stream aberto e a permissão concedida, atualiza o dropdown com os nomes reais das câmeras
+        await refreshCameraList();
+
+      } catch (err) {
+        console.error("Erro ao iniciar câmera:", err);
+
+        // Fallback resiliente: se a webcam não suportar resolução HD (OverconstrainedError),
+        // tenta iniciar com parâmetros de resolução padrão sem travar
+        if (!isCameraRunning) {
+          try {
+            console.warn("Tentando iniciar câmera com configurações de fallback padrão...");
+            const selectedId = preferredCameraId || cameraSelect.value;
+            const simpleCamConfig = (selectedId && selectedId.trim() !== "") ? selectedId : { facingMode: "user" };
+            await html5QrCode.start(simpleCamConfig, { fps: 20 }, onQRCodeDetected, () => {});
+            isCameraRunning = true;
+            camStatusBadge.className = "status-badge status-active";
+            camStatusBadge.textContent = "● Câmera Ativa";
+            btnToggleCam.textContent = "Parar";
+            btnToggleCam.className = "btn btn-sm btn-danger";
+            await refreshCameraList();
+            return;
+          } catch (fallbackErr) {
+            console.error("Erro no fallback da câmera:", fallbackErr);
+          }
+        }
+
+        isCameraRunning = false;
+        camStatusBadge.className = "status-badge status-inactive";
+        camStatusBadge.textContent = "● Clique em Iniciar";
+        btnToggleCam.textContent = "Iniciar";
+        btnToggleCam.className = "btn btn-sm btn-primary";
+
+        if (cameraSelect.options.length <= 1) {
+          cameraSelect.innerHTML = '<option value="">Câmera Padrão (Clique em Iniciar)</option>';
+        }
+
+        const errMsg = String(err).toLowerCase();
+        if (errMsg.includes("notallowederror") || errMsg.includes("permission denied") || errMsg.includes("dismissed")) {
+          showToast("Permissão de câmera não concedida. Clique em 'Permitir' no navegador.", "warning");
+        } else if (errMsg.includes("notreadableerror") || errMsg.includes("already in use") || errMsg.includes("could not start")) {
+          showToast("A câmera parece estar em uso por outro programa.", "error");
+        }
+      }
+    }
+
+    async function stopCamera() {
+      if (html5QrCode && isCameraRunning) {
+        try {
+          await html5QrCode.stop();
+        } catch (err) {
+          console.warn("Aviso ao parar câmera:", err);
+        }
+      }
+      isCameraRunning = false;
+      camStatusBadge.className = "status-badge status-inactive";
+      camStatusBadge.textContent = "● Inativa";
+      btnToggleCam.textContent = "Iniciar";
+      btnToggleCam.className = "btn btn-sm btn-primary";
+    }
+
+    function toggleCamera() {
+      if (isCameraRunning) {
+        stopCamera();
+      } else {
+        startCamera();
+      }
+    }
+
+    cameraSelect.addEventListener('change', () => {
+      if (cameraSelect.value) {
+        startCamera(cameraSelect.value);
+      }
+    });
+
+    async function initCameraModule() {
+      // 1. Tenta listar caso o navegador já tenha concedido permissão anteriormente
+      await refreshCameraList();
+      // 2. Inicia a câmera automaticamente
+      await startCamera();
+    }
+
+    // TRATAMENTO DA DETECÇÃO DE QR CODE
+    function onQRCodeDetected(decodedText) {
+      if (isScanningPaused) return;
+
+      const raw = decodedText.trim();
+      const cleanMat = stripLeadingZeros(raw);
+      const now = Date.now();
+
+      // Evita re-ler o mesmo cartão que acabou de ser confirmado por 2.5s
+      if ((cleanMat === lastConfirmedMatricula || raw === lastConfirmedMatricula) && (now - lastConfirmTime) < 2500) {
+        return;
+      }
+
+      if ((cleanMat === lastScannedQR || raw === lastScannedQR) && (now - lastScannedQRTime) < 1500) {
+        return;
+      }
+      lastScannedQR = cleanMat;
+      lastScannedQRTime = now;
+
+      // Feedback visual na mira e som de confirmação
+      triggerReticleSuccess();
+      beepQR();
+      inputMatricula.value = cleanMat;
+
+      const nome = findEmployeeName(cleanMat) || findEmployeeName(raw);
+      if (nome) {
+        inputNome.value = nome;
+      } else {
+        inputNome.value = "(Não encontrado no relatório)";
+      }
+
+      updateBannerState();
+      checkAutoConfirm();
+    }
+
+    function triggerReticleSuccess() {
+      const reticle = document.getElementById("cameraReticle");
+      if (reticle) {
+        reticle.classList.remove("reticle-success");
+        void reticle.offsetWidth; // Força reflow do navegador para reiniciar animação
+        reticle.classList.add("reticle-success");
+        setTimeout(() => {
+          reticle.classList.remove("reticle-success");
+        }, 550);
+      }
+    }
+
+    // 💳 MÓDULO RFID (WEB SERIAL API - LEITOR J-M15)
+    async function toggleRFIDConnection() {
+      if (isRFIDConnected) {
+        await disconnectRFID();
+      } else {
+        await connectRFID();
+      }
+    }
+
+    async function sendSerialCommand(writer, cmd) {
+      const encoder = new TextEncoder();
+      await writer.write(encoder.encode(cmd));
+      await new Promise(r => setTimeout(r, 80));
+    }
+
+    async function activateRFIDReader() {
+      if (!rfidPort || !rfidPort.writable) return;
+      rfidWriter = rfidPort.writable.getWriter();
+      try {
+        await sendSerialCommand(rfidWriter, "g;10;"); // Pede IMEI
+        await sendSerialCommand(rfidWriter, "g;42;"); // Pede versão firmware
+        await sendSerialCommand(rfidWriter, "g;63;");
+        await sendSerialCommand(rfidWriter, "s;82;0;");
+        await sendSerialCommand(rfidWriter, "s;82;1;"); // Ativa leitura de cartões
+      } finally {
+        rfidWriter.releaseLock();
+      }
+    }
+
+    function processRFIDData(text) {
+      rfidBuffer += text;
+
+      // Procura sequências de 6 a 15 dígitos
+      const matches = rfidBuffer.match(/\d{6,15}/g);
+      if (matches) {
+        matches.forEach(num => {
+          if (num.length >= 13) {
+            // IMEI
+            rfidStatusBadge.className = "status-badge status-active";
+            rfidStatusBadge.textContent = "● Conectado";
+            rfidDeviceInfo.textContent = `IMEI: ${num}`;
+          } else {
+            // Tag RFID
+            const now = Date.now();
+            // Evita re-ler o mesmo cartão que acabou de ser confirmado por 2.5s
+            if (num === lastConfirmedRFID && (now - lastConfirmTime) < 2500) {
+              return;
+            }
+
+            if (num !== lastRFIDTag || (now - lastRFIDTime) > 800) {
+              lastRFIDTag = num;
+              lastRFIDTime = now;
+              beepRFID();
+              inputRFID.value = num;
+              updateBannerState();
+              checkAutoConfirm();
+            }
+          }
+        });
+        rfidBuffer = "";
+      }
+
+      if (rfidBuffer.length > 500) rfidBuffer = rfidBuffer.slice(-100);
+    }
+
+    async function readRFIDLoop() {
+      const decoder = new TextDecoder();
+      while (rfidPort && rfidPort.readable && isRFIDConnected) {
+        rfidReader = rfidPort.readable.getReader();
+        try {
+          while (true) {
+            const { value, done } = await rfidReader.read();
+            if (done) break;
+            if (value) {
+              const text = decoder.decode(value);
+              processRFIDData(text);
+            }
+          }
+        } catch (err) {
+          if (isRFIDConnected) console.error("Erro no loop serial:", err);
+        } finally {
+          if (rfidReader) rfidReader.releaseLock();
+        }
+      }
+    }
+
+    async function connectRFID() {
+      if (!('serial' in navigator)) {
+        alert("Seu navegador não suporta a Web Serial API. Utilize o Google Chrome, Edge ou Brave.");
+        return;
+      }
+
+      try {
+        rfidPort = await navigator.serial.requestPort();
+        await rfidPort.open({ baudRate: 115200 });
+        isRFIDConnected = true;
+
+        rfidStatusBadge.className = "status-badge status-active";
+        rfidStatusBadge.textContent = "● Conectado";
+        btnConnectRFID.textContent = "Desconectar";
+        btnConnectRFID.className = "btn btn-sm btn-danger";
+        rfidDeviceInfo.textContent = "Porta serial aberta (115200 bps)";
+
+        await activateRFIDReader();
+        readRFIDLoop();
+        showToast("Leitor RFID conectado com sucesso!", "success");
+      } catch (err) {
+        console.error("Erro ao conectar RFID:", err);
+        await disconnectRFID();
+      }
+    }
+
+    async function disconnectRFID() {
+      isRFIDConnected = false;
+      if (rfidReader) {
+        try { await rfidReader.cancel(); } catch (_) {}
+      }
+      if (rfidPort) {
+        try { await rfidPort.close(); } catch (_) {}
+        rfidPort = null;
+      }
+      rfidStatusBadge.className = "status-badge status-inactive";
+      rfidStatusBadge.textContent = "● Desconectado";
+      btnConnectRFID.textContent = "🔌 Conectar USB";
+      btnConnectRFID.className = "btn btn-sm btn-primary";
+      rfidDeviceInfo.textContent = "Aguardando conexão...";
+    }
+
+    navigator.serial?.addEventListener('disconnect', disconnectRFID);
+
+    // FLUXO DE ATENDIMENTO / STAGING / AUTO-CONFIRMAÇÃO
+    let autoConfirmTimer = null;
+    let lastConfirmedMatricula = "";
+    let lastConfirmedRFID = "";
+    let lastConfirmTime = 0;
+
+    function checkAutoConfirm() {
+      const isAuto = chkAutoConfirm && chkAutoConfirm.checked;
+      const mat = inputMatricula.value.trim();
+      const rfid = inputRFID.value.trim();
+
+      // Confirma automaticamente se ambos os dados obrigatórios estiverem preenchidos
+      if (isAuto && mat && rfid) {
+        if (autoConfirmTimer) clearTimeout(autoConfirmTimer);
+        autoConfirmTimer = setTimeout(() => {
+          if (inputMatricula.value.trim() && inputRFID.value.trim()) {
+            confirmCard();
+          }
+        }, 300);
+      }
+    }
+
+    function updateBannerState() {
+      const mat = inputMatricula.value.trim();
+      const rfid = inputRFID.value.trim();
+      const isAuto = chkAutoConfirm && chkAutoConfirm.checked;
+
+      if (mat && rfid) {
+        instructionBanner.className = "instruction-banner ready";
+        if (isAuto) {
+          instructionBanner.textContent = "⚡ Tudo pronto! Confirmando e passando para o próximo...";
+        } else {
+          instructionBanner.textContent = "✅ Pronto! Pressione BARRA DE ESPAÇO para confirmar.";
+        }
+      } else if (mat && !rfid) {
+        instructionBanner.className = "instruction-banner waiting";
+        instructionBanner.textContent = "2. QR lido! Aproxime agora o cartão no leitor RFID...";
+      } else if (!mat && rfid) {
+        instructionBanner.className = "instruction-banner waiting";
+        instructionBanner.textContent = "RFID lido! Aproxime o QR Code do crachá na câmera...";
+      } else {
+        instructionBanner.className = "instruction-banner";
+        instructionBanner.textContent = "1. Aproxime o QR Code do crachá na câmera...";
+      }
+    }
+
+    function confirmCard() {
+      if (autoConfirmTimer) {
+        clearTimeout(autoConfirmTimer);
+        autoConfirmTimer = null;
+      }
+
+      const rawMat = inputMatricula.value.trim();
+      const mat = stripLeadingZeros(rawMat);
+      let nome = inputNome.value.trim();
+      const rfid = inputRFID.value.trim();
+
+      if (!mat && !rfid) {
+        showToast("Aproxime o QR Code na câmera e o cartão no leitor antes de confirmar.", "error");
+        return;
+      }
+
+      if (nome === "(Não encontrado no relatório)") nome = "";
+
+      const timeNow = new Date().toLocaleTimeString('pt-BR');
+      const newCard = {
+        codigo: rfid,
+        matricula: mat,
+        nome: nome,
+        hora: timeNow
+      };
+
+      // Registra dados confirmados para evitar re-leitura imediata da mesma tag/QR (2.5s)
+      lastConfirmedMatricula = mat;
+      lastConfirmedRFID = rfid;
+      lastConfirmTime = Date.now();
+
+      // Adiciona no topo da lista (ordem: último lido no primeiro de cima para baixo)
+      cards.unshift(newCard);
+      saveCards();
+      renderCardsTable(true);
+
+      beepConfirm();
+      showToast(`Cartão confirmado: ${nome || mat || rfid}`, "success");
+
+      clearStage(true);
+    }
+
+    function rereadQR() {
+      if (autoConfirmTimer) {
+        clearTimeout(autoConfirmTimer);
+        autoConfirmTimer = null;
+      }
+      inputMatricula.value = "";
+      inputNome.value = "";
+      lastScannedQR = "";
+      updateBannerState();
+      showToast("Pronto para nova leitura de QR Code", "info");
+    }
+
+    function rereadRFID() {
+      if (autoConfirmTimer) {
+        clearTimeout(autoConfirmTimer);
+        autoConfirmTimer = null;
+      }
+      inputRFID.value = "";
+      lastRFIDTag = "";
+      updateBannerState();
+      showToast("Aproxime outro cartão no leitor RFID", "info");
+    }
+
+    function clearStage(afterConfirm = false) {
+      if (autoConfirmTimer) {
+        clearTimeout(autoConfirmTimer);
+        autoConfirmTimer = null;
+      }
+      inputMatricula.value = "";
+      inputNome.value = "";
+      inputRFID.value = "";
+      lastScannedQR = "";
+      lastRFIDTag = "";
+      updateBannerState();
+      if (!afterConfirm) showToast("Campos limpos", "info");
+    }
+
+    // COPIAR PARA EXCEL (ORDEM EXATA: CÓDIGO CARTÃO, MATRÍCULA SEM ZERO À ESQUERDA, NOME)
+    async function copyToExcel() {
+      if (cards.length === 0) {
+        showToast("Nenhum cartão cadastrado para copiar!", "error");
+        return;
+      }
+
+      // Separação de colunas por tabulação (\t) e quebras de linha (\r\n)
+      // Garante explicitamente a matrícula sem zeros à esquerda
+      const lines = cards.map(c => `${c.codigo || ''}\t${stripLeadingZeros(c.matricula)}\t${c.nome || ''}`);
+      const tsvText = lines.join('\r\n');
+
+      try {
+        await navigator.clipboard.writeText(tsvText);
+        showToast(`✓ ${cards.length} cartões copiados! Cole no Excel (Ctrl+V)`, "success");
+      } catch (err) {
+        console.error("Erro ao copiar:", err);
+        showToast("Falha ao copiar para área de transferência", "error");
+      }
+    }
+
+    // EXPORTAR PLANILHA .XLSX DIRETO NO NAVEGADOR COM SHEETJS
+    function exportExcelFile() {
+      if (cards.length === 0) {
+        showToast("Nenhum cartão para exportar!", "error");
+        return;
+      }
+
+      try {
+        const rows = [
+          ["Código Cartão", "Matrícula", "Nome", "Horário"]
+        ];
+        cards.forEach(c => rows.push([c.codigo || '', stripLeadingZeros(c.matricula), c.nome || '', c.hora || '']));
+
+        const ws = XLSX.utils.aoa_to_sheet(rows);
+        const wb = XLSX.utils.book_new();
+        XLSX.utils.book_append_sheet(wb, ws, "Cartões");
+        XLSX.writeFile(wb, "Cartoes_Cadastrados.xlsx");
+        showToast("Planilha baixada com sucesso!", "success");
+      } catch (err) {
+        console.error("Erro ao exportar .xlsx:", err);
+        showToast("Erro ao gerar planilha", "error");
+      }
+    }
+
+    // EDIÇÃO E EXCLUSÃO
+    function openEditModal(index) {
+      const card = cards[index];
+      document.getElementById('editCardIndex').value = index;
+      document.getElementById('editRFID').value = card.codigo || '';
+      document.getElementById('editMatricula').value = stripLeadingZeros(card.matricula);
+      document.getElementById('editNome').value = card.nome || '';
+      document.getElementById('editModal').classList.add('open');
+    }
+
+    function closeEditModal() {
+      document.getElementById('editModal').classList.remove('open');
+    }
+
+    function saveEditCard() {
+      const index = parseInt(document.getElementById('editCardIndex').value, 10);
+      if (index >= 0 && index < cards.length) {
+        cards[index].codigo = document.getElementById('editRFID').value.trim();
+        cards[index].matricula = stripLeadingZeros(document.getElementById('editMatricula').value.trim());
+        cards[index].nome = document.getElementById('editNome').value.trim();
+        saveCards();
+        renderCardsTable();
+        closeEditModal();
+        showToast("Cartão atualizado com sucesso!", "success");
+      }
+    }
+
+    function deleteCard(index) {
+      if (confirm(`Deseja remover o cartão de ${cards[index].nome || cards[index].matricula || cards[index].codigo}?`)) {
+        cards.splice(index, 1);
+        saveCards();
+        renderCardsTable();
+        showToast("Cartão removido", "info");
+      }
+    }
+
+    function clearAllCards() {
+      if (cards.length === 0) return;
+      if (confirm("Deseja realmente apagar todos os cartões cadastrados da lista?")) {
+        cards = [];
+        saveCards();
+        renderCardsTable();
+        showToast("Lista limpa com sucesso", "info");
+      }
+    }
+
+    // ATALHOS DE TECLADO
+    window.addEventListener('keydown', (e) => {
+      // Barra de espaço confirma cartão
+      if (e.code === 'Space' && e.target.tagName !== 'INPUT') {
+        e.preventDefault();
+        confirmCard();
+      }
+      // F2 relê QR
+      if (e.code === 'F2') {
+        e.preventDefault();
+        rereadQR();
+      }
+      // F3 relê RFID
+      if (e.code === 'F3') {
+        e.preventDefault();
+        rereadRFID();
+      }
+      // Esc limpa ou fecha modal
+      if (e.code === 'Escape') {
+        if (document.getElementById('editModal').classList.contains('open')) {
+          closeEditModal();
+        } else {
+          clearStage();
+        }
+      }
+      // Ctrl + C copia
+      if ((e.ctrlKey || e.metaKey) && (e.key === 'c' || e.key === 'C')) {
+        if (!window.getSelection().toString()) {
+          copyToExcel();
+        }
+      }
+    });
+
+    // TOAST FEEDBACK
+    let toastTimeout = null;
+    function showToast(msg, type = "info") {
+      const toast = document.getElementById('toastNotification');
+      toast.textContent = msg;
+      toast.className = `toast show ${type}`;
+      clearTimeout(toastTimeout);
+      toastTimeout = setTimeout(() => {
+        toast.className = "toast";
+      }, 2600);
+    }
+
+    // INICIALIZAÇÃO
+    window.addEventListener('DOMContentLoaded', async () => {
+      updateReportBadge();
+      renderCardsTable();
+      await initCameraModule();
+    });
+  </script>
+</body>
+</html>
