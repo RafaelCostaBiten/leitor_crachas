@@ -27,7 +27,8 @@ A página é **100% autônoma (HTML/JS nativo)**, sem necessidade de backend Pyt
    * Aproxime o **cartão no leitor RFID**: o código numérico é capturado.
    * **Confirmação Automática:** Com a opção **⚡ Auto-confirmar** ativa (ligada por padrão), assim que o QR e o RFID são lidos, o cartão é confirmado e gravado no topo da lista automaticamente, já limpando os campos e ficando pronto para o próximo crachá!
    * Caso desmarque o Auto-confirmar, você pode confirmar manualmente pressionando a **Barra de Espaço** (ou clicando no botão verde).
-4. **Copiar para o Excel:**
+4. **Proteção Contra Duplicidades:** Se um cartão RFID ou Matrícula já registrado for lido novamente, o sistema emite um bipe sonoro de erro, trava a gravação automática e exibe uma janela de alerta com os dados do cadastro anterior (Nome, Matrícula, RFID e Horário). O operador deve clicar em **OK** (ou apertar `Enter`/`Espaço`) para descartar a leitura repetida e ler o crachá correto.
+5. **Copiar para o Excel:**
    * Clique em **"📋 Copiar para o Excel (Ctrl+C)"** (ou pressione `Ctrl+C`).
    * No Excel, clique na célula desejada e pressione `Ctrl + V`.
    * Ordem das colunas: **Código Cartão (RFID)** | **Matrícula (sem zero à esquerda)** | **Nome do Motorista**.
