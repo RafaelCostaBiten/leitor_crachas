@@ -326,6 +326,39 @@
     .field-input { width: 100%; font-size: 0.85rem; font-weight: 600; padding: 5px 8px; }
     .field-input.mono { font-family: monospace; font-size: 0.9rem; }
 
+    /* Estilos da Lista de Apoio e Informação Vinculada */
+    .extra-info-box { display: flex; align-items: center; gap: 6px; }
+    .extra-info-badge {
+      background: #ede9fe;
+      color: #5b21b6;
+      border: 1.5px solid #c4b5fd;
+      border-radius: 6px;
+      padding: 3px 10px;
+      font-weight: 700;
+      font-size: 0.88rem;
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      box-shadow: 0 1px 3px rgba(109, 40, 217, 0.12);
+      animation: popIn 0.2s ease-out;
+    }
+    .table-tag-extra {
+      display: inline-block;
+      background: #ede9fe;
+      color: #5b21b6;
+      font-size: 0.72rem;
+      font-weight: 700;
+      padding: 1px 7px;
+      border-radius: 4px;
+      border: 1px solid #ddd6fe;
+      margin-left: 6px;
+      vertical-align: middle;
+    }
+    @keyframes popIn {
+      0% { transform: scale(0.92); opacity: 0; }
+      100% { transform: scale(1); opacity: 1; }
+    }
+
     .staging-buttons { display: flex; gap: 5px; }
     .btn-confirm-main {
       width: 100%;
@@ -551,6 +584,9 @@
       <span id="reportInfo" class="badge-info">📄 Relatório Motoristas.XLS</span>
       <input type="file" id="excelFileInput" accept=".xls,.xlsx,.csv" style="display: none;" onchange="handleExcelUpload(event)">
       <button class="btn btn-sm btn-secondary" onclick="document.getElementById('excelFileInput').click()">📂 Trocar Relatório</button>
+      <button class="btn btn-sm btn-secondary" onclick="openExtraInfoModal()" title="Colar lista de matrículas com informações/responsáveis associados">
+        📋 Lista de Apoio <span id="badgeExtraCount" style="display:none; background:#6366f1; color:white; padding:1px 6px; border-radius:10px; font-size:0.75rem; margin-left:4px; font-weight:700;">0</span>
+      </button>
     </div>
   </header>
 
@@ -632,6 +668,13 @@
             <input type="text" id="inputNome" class="field-input" placeholder="Preenchimento automático">
           </div>
 
+          <div class="field-row" id="rowExtraInfo" style="display: none;">
+            <label class="field-label" style="color: #6d28d9;">Info Vinculada:</label>
+            <div class="extra-info-box">
+              <span class="extra-info-badge" id="textExtraInfo">-</span>
+            </div>
+          </div>
+
           <div class="field-row">
             <label class="field-label">Código RFID:</label>
             <input type="text" id="inputRFID" class="field-input mono" placeholder="Aproxime o cartão no leitor..." oninput="onManualRFIDInput()">
@@ -662,6 +705,7 @@
           <div><strong style="color: var(--text-muted);">RFID:</strong> <span id="lastPreviewRFID" style="font-family: monospace; font-weight: 700; color: #0284c7;">-</span></div>
           <div><strong style="color: var(--text-muted);">Matrícula:</strong> <span id="lastPreviewMat" style="font-family: monospace; font-weight: 700;">-</span></div>
           <div><strong style="color: var(--text-muted);">Nome:</strong> <span id="lastPreviewNome" style="font-weight: 600;">(Nenhum cartão cadastrado ainda)</span></div>
+          <div id="lastPreviewExtraRow" style="display: none;"><strong style="color: var(--text-muted);">Info:</strong> <span id="lastPreviewExtra" style="font-weight: 700; color: #6d28d9;">-</span></div>
         </div>
 
         <div style="margin-top: auto; padding-top: 6px;">
@@ -788,6 +832,30 @@
     </div>
   </div>
 
+  <!-- MODAL DE LISTA DE APOIO (INFORMAÇÕES VINCULADAS) -->
+  <div id="extraInfoModal" class="modal-overlay">
+    <div class="modal-box" style="width: 520px; max-width: 92vw;">
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 8px;">
+        <h3 style="margin: 0; font-size: 1.05rem; color: var(--text-main);">📋 Lista de Apoio / Informações Vinculadas</h3>
+        <button class="btn btn-sm btn-secondary" onclick="closeExtraInfoModal()" style="padding: 2px 7px; font-size: 0.9rem;">✕</button>
+      </div>
+
+      <p style="font-size: 0.82rem; color: #475569; margin-bottom: 8px; line-height: 1.4;">
+        Cole abaixo duas colunas copiadas do Excel (<strong>Coluna 1: Matrícula</strong> e <strong>Coluna 2: Informação / Responsável</strong>). Ao escanear o crachá, a informação correspondente será exibida na tela.
+      </p>
+
+      <textarea id="txtExtraInfo" placeholder="Exemplo:&#10;32810	Elton&#10;36725	Elton&#10;31925	Rodrigo&#10;18511	Rodrigo&#10;20313	Rodrigo" rows="9" style="width: 100%; font-family: monospace; font-size: 0.86rem; padding: 8px; border: 1px solid var(--card-border); border-radius: 6px; box-sizing: border-box; resize: vertical; outline: none; background: #f8fafc;"></textarea>
+
+      <div style="display: flex; justify-content: space-between; align-items: center; margin-top: 10px;">
+        <button class="btn btn-sm btn-danger" onclick="clearExtraInfoList()">🧹 Limpar Lista</button>
+        <div style="display: flex; gap: 8px;">
+          <button class="btn btn-sm btn-secondary" onclick="closeExtraInfoModal()">Cancelar</button>
+          <button class="btn btn-sm btn-primary" onclick="saveExtraInfoList()">💾 Salvar Lista</button>
+        </div>
+      </div>
+    </div>
+  </div>
+
   <!-- TOAST DE NOTIFICAÇÃO -->
   <div id="toastNotification" class="toast">Mensagem</div>
 
@@ -812,6 +880,155 @@
     cards.forEach(c => {
       c.matricula = stripLeadingZeros(c.matricula);
     });
+
+    // 3. LISTA DE APOIO (INFORMAÇÕES VINCULADAS ÀS MATRÍCULAS)
+    let extraInfoMap = {};
+    let extraInfoRaw = "";
+
+    function loadExtraInfoFromStorage() {
+      try {
+        const savedMap = localStorage.getItem('crachas_extra_info_map');
+        if (savedMap) {
+          extraInfoMap = JSON.parse(savedMap) || {};
+        }
+        extraInfoRaw = localStorage.getItem('crachas_extra_info_raw') || "";
+        updateExtraInfoCountBadge();
+      } catch (e) {
+        console.warn("Erro ao carregar lista de apoio:", e);
+      }
+    }
+
+    function updateExtraInfoCountBadge() {
+      const badge = document.getElementById('badgeExtraCount');
+      if (!badge) return;
+      const uniqueKeys = new Set(Object.keys(extraInfoMap).map(k => stripLeadingZeros(k)));
+      const count = uniqueKeys.size;
+      if (count > 0) {
+        badge.textContent = count;
+        badge.style.display = 'inline-block';
+      } else {
+        badge.style.display = 'none';
+      }
+    }
+
+    function openExtraInfoModal() {
+      const txt = document.getElementById('txtExtraInfo');
+      if (txt) {
+        txt.value = extraInfoRaw;
+      }
+      document.getElementById('extraInfoModal').classList.add('open');
+      if (txt) txt.focus();
+    }
+
+    function closeExtraInfoModal() {
+      document.getElementById('extraInfoModal').classList.remove('open');
+    }
+
+    function parseExtraInfoText(text) {
+      const map = {};
+      const lines = text.split(/\r?\n/);
+      let count = 0;
+
+      lines.forEach(line => {
+        const trimmed = line.trim();
+        if (!trimmed) return;
+
+        let col1 = "";
+        let col2 = "";
+
+        if (trimmed.includes('\t')) {
+          const parts = trimmed.split('\t');
+          col1 = parts[0].trim();
+          col2 = parts.slice(1).join(' ').trim();
+        } else if (trimmed.includes(';') && !trimmed.includes(',')) {
+          const parts = trimmed.split(';');
+          col1 = parts[0].trim();
+          col2 = parts.slice(1).join(';').trim();
+        } else if (trimmed.includes(',')) {
+          const parts = trimmed.split(',');
+          col1 = parts[0].trim();
+          col2 = parts.slice(1).join(',').trim();
+        } else {
+          const match = trimmed.match(/^(\S+)\s+(.+)$/);
+          if (match) {
+            col1 = match[1].trim();
+            col2 = match[2].trim();
+          }
+        }
+
+        if (col1 && col2) {
+          const clean = stripLeadingZeros(col1);
+          map[clean] = col2;
+          map[col1] = col2;
+          map[clean.padStart(6, '0')] = col2;
+          count++;
+        }
+      });
+
+      return { map, count };
+    }
+
+    function saveExtraInfoList() {
+      const txt = document.getElementById('txtExtraInfo');
+      const raw = txt ? txt.value : "";
+      const { map, count } = parseExtraInfoText(raw);
+
+      extraInfoMap = map;
+      extraInfoRaw = raw;
+
+      localStorage.setItem('crachas_extra_info_map', JSON.stringify(map));
+      localStorage.setItem('crachas_extra_info_raw', raw);
+
+      updateExtraInfoCountBadge();
+      closeExtraInfoModal();
+
+      updateExtraInfoDisplay(inputMatricula ? inputMatricula.value : "");
+      renderCardsTable();
+
+      showToast(`✓ Lista de apoio salva! ${count} registros vinculados`, "success");
+    }
+
+    function clearExtraInfoList() {
+      if (confirm("Deseja realmente limpar a lista de apoio?")) {
+        extraInfoMap = {};
+        extraInfoRaw = "";
+        localStorage.removeItem('crachas_extra_info_map');
+        localStorage.removeItem('crachas_extra_info_raw');
+        const txt = document.getElementById('txtExtraInfo');
+        if (txt) txt.value = "";
+        updateExtraInfoCountBadge();
+        updateExtraInfoDisplay("");
+        renderCardsTable();
+        closeExtraInfoModal();
+        showToast("Lista de apoio limpa", "info");
+      }
+    }
+
+    function getExtraInfo(mat) {
+      if (!mat) return "";
+      const clean = stripLeadingZeros(mat);
+      if (extraInfoMap[clean]) return extraInfoMap[clean];
+      const raw = String(mat).trim();
+      if (extraInfoMap[raw]) return extraInfoMap[raw];
+      const padded = clean.padStart(6, '0');
+      if (extraInfoMap[padded]) return extraInfoMap[padded];
+      return "";
+    }
+
+    function updateExtraInfoDisplay(mat) {
+      const row = document.getElementById('rowExtraInfo');
+      const text = document.getElementById('textExtraInfo');
+      if (!row || !text) return;
+
+      const info = getExtraInfo(mat);
+      if (info) {
+        text.innerHTML = `🏷️ ${info}`;
+        row.style.display = 'grid';
+      } else {
+        text.innerHTML = '';
+        row.style.display = 'none';
+      }
+    }
 
     // Câmera & Scanner
     let html5QrCode = null;
@@ -998,6 +1215,7 @@
     function onManualMatriculaInput() {
       const mat = inputMatricula.value.trim();
       const cleanMat = stripLeadingZeros(mat);
+      updateExtraInfoDisplay(cleanMat);
       if (mat) {
         const nome = findEmployeeName(cleanMat) || findEmployeeName(mat);
         if (nome) {
@@ -1005,6 +1223,8 @@
         } else {
           inputNome.value = "(Não encontrado no relatório)";
         }
+      } else {
+        inputNome.value = "";
       }
       updateBannerState();
       checkAutoConfirm();
@@ -1013,6 +1233,7 @@
     inputMatricula.addEventListener('blur', () => {
       if (inputMatricula.value) {
         inputMatricula.value = stripLeadingZeros(inputMatricula.value);
+        updateExtraInfoDisplay(inputMatricula.value);
       }
     });
 
@@ -1097,6 +1318,8 @@
       const pMat = document.getElementById('lastPreviewMat');
       const pNome = document.getElementById('lastPreviewNome');
       const pBadge = document.getElementById('lastCardBadge');
+      const pExtraRow = document.getElementById('lastPreviewExtraRow');
+      const pExtra = document.getElementById('lastPreviewExtra');
       if (!pRFID) return;
 
       if (cards.length > 0) {
@@ -1105,11 +1328,21 @@
         pMat.textContent = stripLeadingZeros(c.matricula) || '-';
         pNome.textContent = c.nome || '-';
         pBadge.textContent = c.hora ? `Às ${c.hora}` : '';
+        const extra = c.extra || getExtraInfo(c.matricula);
+        if (pExtraRow && pExtra) {
+          if (extra) {
+            pExtra.textContent = extra;
+            pExtraRow.style.display = 'block';
+          } else {
+            pExtraRow.style.display = 'none';
+          }
+        }
       } else {
         pRFID.textContent = '-';
         pMat.textContent = '-';
         pNome.textContent = '(Nenhum cartão gravado ainda)';
         pBadge.textContent = '-';
+        if (pExtraRow) pExtraRow.style.display = 'none';
       }
     }
 
@@ -1121,10 +1354,14 @@
         if (highlightFirst && idx === 0) tr.classList.add('latest-row');
 
         const cleanMat = stripLeadingZeros(card.matricula);
+        const extra = card.extra || getExtraInfo(cleanMat);
         tr.innerHTML = `
           <td style="font-family: monospace; font-weight: 700; color: #0284c7;">${card.codigo || '-'}</td>
           <td style="font-family: monospace; font-weight: 700;">${cleanMat || '-'}</td>
-          <td style="font-weight: 600;">${card.nome || '-'}</td>
+          <td style="font-weight: 600;">
+            ${card.nome || '-'}
+            ${extra ? `<span class="table-tag-extra" title="Informação vinculada">🏷️ ${extra}</span>` : ''}
+          </td>
           <td style="text-align: center; color: var(--text-muted); font-size: 0.82rem;">${card.hora || '-'}</td>
           <td style="text-align: center;">
             <button class="btn btn-sm btn-secondary" onclick="openEditModal(${idx})" title="Editar">✏️</button>
@@ -1343,6 +1580,7 @@
       triggerReticleSuccess();
       beepQR();
       inputMatricula.value = cleanMat;
+      updateExtraInfoDisplay(cleanMat);
 
       const nome = findEmployeeName(cleanMat) || findEmployeeName(raw);
       if (nome) {
@@ -1532,17 +1770,19 @@
       const mat = inputMatricula.value.trim();
       const rfid = inputRFID.value.trim();
       const isAuto = chkAutoConfirm && chkAutoConfirm.checked;
+      const extra = getExtraInfo(mat);
+      const extraTag = extra ? ` [${extra}]` : "";
 
       if (mat && rfid) {
         instructionBanner.className = "instruction-banner ready";
         if (isAuto) {
-          instructionBanner.textContent = "⚡ Tudo pronto! Confirmando e passando para o próximo...";
+          instructionBanner.textContent = `⚡ Tudo pronto${extraTag}! Confirmando e passando para o próximo...`;
         } else {
-          instructionBanner.textContent = "✅ Pronto! Pressione BARRA DE ESPAÇO para confirmar.";
+          instructionBanner.textContent = `✅ Pronto${extraTag}! Pressione BARRA DE ESPAÇO para confirmar.`;
         }
       } else if (mat && !rfid) {
         instructionBanner.className = "instruction-banner waiting";
-        instructionBanner.textContent = "2. QR lido! Aproxime agora o cartão no leitor RFID...";
+        instructionBanner.textContent = `2. QR lido${extraTag}! Aproxime agora o cartão no leitor RFID...`;
       } else if (!mat && rfid) {
         instructionBanner.className = "instruction-banner waiting";
         instructionBanner.textContent = "RFID lido! Aproxime o QR Code do crachá na câmera...";
@@ -1582,10 +1822,12 @@
       if (nome === "(Não encontrado no relatório)") nome = "";
 
       const timeNow = new Date().toLocaleTimeString('pt-BR');
+      const extra = getExtraInfo(mat);
       const newCard = {
         codigo: rfid,
         matricula: mat,
         nome: nome,
+        extra: extra,
         hora: timeNow
       };
 
@@ -1600,7 +1842,7 @@
       renderCardsTable(true);
 
       beepConfirm();
-      showToast(`Cartão confirmado: ${nome || mat || rfid}`, "success");
+      showToast(`Cartão confirmado: ${nome || mat || rfid}${extra ? ' (' + extra + ')' : ''}`, "success");
 
       clearStage(true);
     }
@@ -1613,6 +1855,7 @@
       inputMatricula.value = "";
       inputNome.value = "";
       lastScannedQR = "";
+      updateExtraInfoDisplay("");
       updateBannerState();
       showToast("Pronto para nova leitura de QR Code", "info");
     }
@@ -1638,6 +1881,7 @@
       inputRFID.value = "";
       lastScannedQR = "";
       lastRFIDTag = "";
+      updateExtraInfoDisplay("");
       updateBannerState();
       if (!afterConfirm) showToast("Campos limpos", "info");
     }
@@ -1672,9 +1916,15 @@
 
       try {
         const rows = [
-          ["Código Cartão", "Matrícula", "Nome", "Horário"]
+          ["Código Cartão", "Matrícula", "Nome", "Info / Responsável", "Horário"]
         ];
-        cards.forEach(c => rows.push([c.codigo || '', stripLeadingZeros(c.matricula), c.nome || '', c.hora || '']));
+        cards.forEach(c => rows.push([
+          c.codigo || '',
+          stripLeadingZeros(c.matricula),
+          c.nome || '',
+          c.extra || getExtraInfo(c.matricula) || '',
+          c.hora || ''
+        ]));
 
         const ws = XLSX.utils.aoa_to_sheet(rows);
         const wb = XLSX.utils.book_new();
@@ -1724,6 +1974,7 @@
         cards[index].codigo = newRFID;
         cards[index].matricula = newMat;
         cards[index].nome = newNome;
+        cards[index].extra = getExtraInfo(newMat);
         saveCards();
         renderCardsTable();
         closeEditModal();
@@ -1780,6 +2031,8 @@
       if (e.code === 'Escape') {
         if (document.getElementById('editModal').classList.contains('open')) {
           closeEditModal();
+        } else if (document.getElementById('extraInfoModal').classList.contains('open')) {
+          closeExtraInfoModal();
         } else {
           clearStage();
         }
@@ -1806,6 +2059,7 @@
 
     // INICIALIZAÇÃO
     window.addEventListener('DOMContentLoaded', async () => {
+      loadExtraInfoFromStorage();
       updateReportBadge();
       renderCardsTable();
       await initCameraModule();
