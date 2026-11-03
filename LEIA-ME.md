@@ -24,7 +24,7 @@ A página é **100% autônoma (HTML/JS nativo)**, sem necessidade de backend Pyt
 2. **Leitor RFID USB:** Clique no botão azul **"🔌 Conectar Leitor USB"** e selecione a porta serial do leitor (geralmente `Dispositivo Serial USB / COM3`).
 3. **Ajustes de Imagem da Câmera (Sem Mudar Resolução):**
    * **⚙️ Ajustes de Imagem:** Permite ajustar **Brilho**, **Contraste**, **Nitidez** e **Saturação** em controles idênticos aos das Configurações de Câmera do Windows 11.
-   * **⚡ Melhor Leitura:** Aplica em 1 clique o preset ideal para leitura de QR Codes (contraste elevado, nitidez e saturação equilibrada) sem alterar a resolução do sensor.
+   * **⚡ Melhor Leitura:** Aplica em 1 clique o preset ideal para leitura de QR Codes (**Brilho 50%**, **Contraste 145%**, **Nitidez 40%**, **Saturação 60%**) sem alterar a resolução do sensor.
    * **🔄 Redefinir configurações:** Funciona exatamente como o botão *"Redefinir configurações padrão da câmera"* do Windows, retornando brilho, contraste, nitidez e saturação aos padrões de fábrica e liberando o hardware para reuniões no Teams/Meet.
    * **🖥️ Câmeras do Windows:** Atalho que abre diretamente a tela nativa de configurações de câmera do Windows.
 4. **Leitura e Associação (Fluxo 100% Automático):**
