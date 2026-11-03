@@ -78,7 +78,7 @@
     /* Layout Horizontal em 3 Colunas (Sem rolagem vertical em 1920x1080) */
     .main-layout {
       display: grid;
-      grid-template-columns: 310px 370px 1fr;
+      grid-template-columns: 325px 365px 1fr;
       gap: 12px;
       padding: 10px 16px;
       flex: 1;
@@ -556,11 +556,10 @@
     /* Painel e Controles de Imagem da Câmera (Estilo Configurações do Windows) */
     .cam-image-tools {
       display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
+      flex-direction: column;
+      gap: 5px;
       margin-top: 6px;
-      padding-top: 5px;
+      padding-top: 6px;
       border-top: 1px dashed var(--card-border);
     }
     .cam-setting-row {
@@ -682,19 +681,19 @@
           <button id="btnToggleCam" class="btn btn-sm btn-primary" onclick="toggleCamera()">Iniciar</button>
         </div>
 
-        <!-- BARRA DE AJUSTES DE IMAGEM DA CÂMERA (BRILHO, CONTRASTE, NITIDEZ, SATURAÇÃO) -->
+        <!-- BARRA DE AJUSTES DE IMAGEM DA CÂMERA -->
         <div class="cam-image-tools">
-          <button class="btn btn-sm btn-secondary" onclick="openCamSettingsModal()" title="Configurações de Brilho, Contraste, Nitidez e Saturação" style="font-size: 0.76rem; padding: 4px 7px;">
-            ⚙️ Ajustes de Imagem
-          </button>
-          <div style="display: flex; gap: 4px;">
-            <button class="btn btn-sm btn-primary" onclick="applyPresetMelhorLeitura()" title="Aumenta contraste e nitidez para melhor leitura do QR Code" style="font-size: 0.76rem; padding: 4px 7px; background: #0284c7;">
+          <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 6px; width: 100%;">
+            <button class="btn btn-sm btn-primary" onclick="applyPresetMelhorLeitura()" title="Aplica a melhor configuração de leitura: Brilho 50%, Contraste 145%, Nitidez 40%, Saturação 60%" style="font-size: 0.77rem; padding: 5px 6px; background: #0284c7; font-weight: 700; width: 100%;">
               ⚡ Melhor Leitura
             </button>
-            <button class="btn btn-sm btn-secondary" onclick="resetCamSettingsToDefault()" title="Redefine as configurações para o padrão da câmera (igual ao botão do Windows)" style="font-size: 0.76rem; padding: 4px 7px;">
+            <button class="btn btn-sm btn-secondary" onclick="resetCamSettingsToDefault()" title="Redefine as configurações para o padrão da câmera do Windows" style="font-size: 0.77rem; padding: 5px 6px; font-weight: 700; width: 100%;">
               🔄 Redefinir
             </button>
           </div>
+          <button class="btn btn-sm btn-secondary" onclick="openCamSettingsModal()" title="Configurações manuais de Brilho, Contraste, Nitidez e Saturação" style="width: 100%; font-size: 0.75rem; padding: 4px 6px; background: #f8fafc; border: 1px solid #e2e8f0; color: #475569;">
+            ⚙️ Ajustes de Imagem (Sliders)
+          </button>
         </div>
       </div>
 
@@ -910,36 +909,36 @@
         <div class="cam-setting-row">
           <span class="cam-setting-label">☀️ Brilho</span>
           <button class="cam-step-btn" onclick="stepCamSlider('brilho', -5)" title="Diminuir brilho">−</button>
-          <input type="range" class="cam-slider" id="sliderBrilho" min="50" max="150" value="100" oninput="onCamSliderChange('brilho', this.value)">
+          <input type="range" class="cam-slider" id="sliderBrilho" min="0" max="150" value="50" oninput="onCamSliderChange('brilho', this.value)">
           <button class="cam-step-btn" onclick="stepCamSlider('brilho', 5)" title="Aumentar brilho">+</button>
-          <span class="cam-setting-val" id="valBrilho">100%</span>
+          <span class="cam-setting-val" id="valBrilho">50%</span>
         </div>
 
         <!-- 🌓 Contraste -->
         <div class="cam-setting-row">
           <span class="cam-setting-label">🌓 Contraste</span>
           <button class="cam-step-btn" onclick="stepCamSlider('contraste', -5)" title="Diminuir contraste">−</button>
-          <input type="range" class="cam-slider" id="sliderContraste" min="50" max="200" value="100" oninput="onCamSliderChange('contraste', this.value)">
+          <input type="range" class="cam-slider" id="sliderContraste" min="50" max="200" value="145" oninput="onCamSliderChange('contraste', this.value)">
           <button class="cam-step-btn" onclick="stepCamSlider('contraste', 5)" title="Aumentar contraste">+</button>
-          <span class="cam-setting-val" id="valContraste">100%</span>
+          <span class="cam-setting-val" id="valContraste">145%</span>
         </div>
 
         <!-- 📐 Nitidez -->
         <div class="cam-setting-row">
           <span class="cam-setting-label">📐 Nitidez</span>
           <button class="cam-step-btn" onclick="stepCamSlider('nitidez', -5)" title="Diminuir nitidez">−</button>
-          <input type="range" class="cam-slider" id="sliderNitidez" min="0" max="100" value="0" oninput="onCamSliderChange('nitidez', this.value)">
+          <input type="range" class="cam-slider" id="sliderNitidez" min="0" max="100" value="40" oninput="onCamSliderChange('nitidez', this.value)">
           <button class="cam-step-btn" onclick="stepCamSlider('nitidez', 5)" title="Aumentar nitidez">+</button>
-          <span class="cam-setting-val" id="valNitidez">0%</span>
+          <span class="cam-setting-val" id="valNitidez">40%</span>
         </div>
 
         <!-- 🎨 Saturação -->
         <div class="cam-setting-row" style="border-bottom: none;">
           <span class="cam-setting-label">🎨 Saturação</span>
           <button class="cam-step-btn" onclick="stepCamSlider('saturacao', -5)" title="Diminuir saturação">−</button>
-          <input type="range" class="cam-slider" id="sliderSaturacao" min="0" max="200" value="100" oninput="onCamSliderChange('saturacao', this.value)">
+          <input type="range" class="cam-slider" id="sliderSaturacao" min="0" max="200" value="60" oninput="onCamSliderChange('saturacao', this.value)">
           <button class="cam-step-btn" onclick="stepCamSlider('saturacao', 5)" title="Aumentar saturação">+</button>
-          <span class="cam-setting-val" id="valSaturacao">100%</span>
+          <span class="cam-setting-val" id="valSaturacao">60%</span>
         </div>
       </div>
 
@@ -1232,11 +1231,12 @@
     const chkAutoConfirm = document.getElementById('chkAutoConfirm');
 
     // Configurações de Imagem da Câmera (Brilho, Contraste, Nitidez, Saturação)
+    // Otimização validada pelo usuário para leitura de crachás: Brilho 50%, Contraste 145%, Nitidez 40%, Saturação 60%
     let camSettings = {
-      brilho: 100,
-      contraste: 100,
-      nitidez: 0,
-      saturacao: 100
+      brilho: 50,
+      contraste: 145,
+      nitidez: 40,
+      saturacao: 60
     };
     try {
       const savedCamSettings = localStorage.getItem('crachas_cam_settings');
@@ -1793,7 +1793,7 @@
         const advanced = {};
         if (caps.brightness) {
           const min = caps.brightness.min, max = caps.brightness.max;
-          advanced.brightness = min + ((settings.brilho - 50) / 100) * (max - min);
+          advanced.brightness = min + Math.max(0, Math.min(1, settings.brilho / 150)) * (max - min);
         }
         if (caps.contrast) {
           const min = caps.contrast.min, max = caps.contrast.max;
@@ -1816,14 +1816,14 @@
       }
     }
 
-    // PRESET: APLICAR MELHOR LEITURA DE QR CODE
+    // PRESET: APLICAR MELHOR LEITURA DE QR CODE (Configs ideais validadas pelo usuário)
     function applyPresetMelhorLeitura() {
-      camSettings.brilho = 108;
+      camSettings.brilho = 50;
       camSettings.contraste = 145;
       camSettings.nitidez = 40;
       camSettings.saturacao = 60;
       applyCamSettings();
-      showToast("⚡ Modo Melhor Leitura ativado (Alto Contraste & Nitidez)!", "info");
+      showToast("⚡ Modo Melhor Leitura ativado (Brilho 50%, Contraste 145%, Nitidez 40%, Saturação 60%)!", "info");
     }
 
     // REDEFINIR CONFIGURAÇÕES PADRÃO DA CÂMERA (Igual ao botão do Windows)
@@ -1863,12 +1863,12 @@
     }
 
     function stepCamSlider(settingKey, delta) {
-      let min = 50, max = 150;
+      let min = 0, max = 150;
       if (settingKey === 'contraste') { min = 50; max = 200; }
       else if (settingKey === 'nitidez') { min = 0; max = 100; }
       else if (settingKey === 'saturacao') { min = 0; max = 200; }
 
-      let current = camSettings[settingKey] || 100;
+      let current = (camSettings[settingKey] !== undefined) ? camSettings[settingKey] : 100;
       let next = Math.max(min, Math.min(max, current + delta));
       camSettings[settingKey] = next;
       applyCamSettings();
