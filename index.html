@@ -620,6 +620,20 @@
           </select>
           <button id="btnToggleCam" class="btn btn-sm btn-primary" onclick="toggleCamera()">Iniciar</button>
         </div>
+
+        <!-- PERFIL DE CÂMERA & RESET PARA REUNIÕES -->
+        <div class="cam-profile-bar" style="display: flex; align-items: center; justify-content: space-between; gap: 6px; margin-top: 6px; padding-top: 6px; border-top: 1px dashed var(--card-border); font-size: 0.78rem;">
+          <div style="display: flex; align-items: center; gap: 4px;">
+            <span style="font-weight: 700; color: #475569;" title="Perfil de captura de vídeo">Perfil:</span>
+            <select id="camProfileSelect" style="padding: 3px 6px; font-size: 0.76rem; border-radius: 4px;" onchange="changeCameraProfile()" title="Alterne entre modo HD otimizado para ler QR Code e modo Padrão para reuniões">
+              <option value="hd">⚡ Alta Precisão (HD)</option>
+              <option value="default">🎥 Padrão (Reunião)</option>
+            </select>
+          </div>
+          <button id="btnResetCam" class="btn btn-sm btn-secondary" onclick="resetCameraToDefault()" title="Restaura a webcam ao modo padrão do Windows e libera o hardware para reuniões" style="padding: 3px 8px; font-size: 0.75rem;">
+            🔄 Reset Padrão
+          </button>
+        </div>
       </div>
 
       <!-- CARD 2: LEITOR RFID USB -->
@@ -1050,6 +1064,8 @@
     const reportInfo = document.getElementById('reportInfo');
     const camStatusBadge = document.getElementById('camStatusBadge');
     const cameraSelect = document.getElementById('cameraSelect');
+    const camProfileSelect = document.getElementById('camProfileSelect');
+    const btnResetCam = document.getElementById('btnResetCam');
     const btnToggleCam = document.getElementById('btnToggleCam');
     const rfidStatusBadge = document.getElementById('rfidStatusBadge');
     const btnConnectRFID = document.getElementById('btnConnectRFID');
@@ -1062,6 +1078,9 @@
     const cardCountLabel = document.getElementById('cardCountLabel');
     const soundToggle = document.getElementById('soundToggle');
     const chkAutoConfirm = document.getElementById('chkAutoConfirm');
+
+    // Perfil de Câmera (hd = Alta Precisão 720p; default = Padrão Windows/Reunião)
+    let currentCamProfile = localStorage.getItem('crachas_cam_profile') || 'hd';
 
     // Auto-confirmar (Padrão: ATIVADO)
     const savedAutoConfirm = localStorage.getItem('crachas_auto_confirm');
@@ -1433,24 +1452,27 @@
           ? selectedId
           : { facingMode: "user" };
 
-        // Otimização de Leitura para Câmeras de Notebook:
-        // 1. Omitimos qrbox para que o algoritmo analise o quadro INTEIRO (100% da área),
-        //    eliminando o problema de corte onde os marcadores de canto do QR ficavam fora da mira de 100px.
-        // 2. Solicitamos resolução HD 720p (ideal: 1280x720) para máxima nitidez das linhas do código.
-        // 3. FPS a 25 quadros/segundo para leitura instantânea ao posicionar o crachá.
+        // Otimização e Perfis de Câmera:
+        // - "hd": Força resolução 720p HD (1280x720) e 25 FPS para leitura instantânea de QR Code
+        // - "default": Usa as resoluções e parâmetros nativos/padrão do driver da webcam sem restrições (ideal para reuniões)
+        const isHD = (currentCamProfile === 'hd');
         const config = {
-          fps: 25,
-          videoConstraints: (selectedId && selectedId.trim() !== "")
-            ? {
-                deviceId: { exact: selectedId },
-                width: { ideal: 1280, min: 640 },
-                height: { ideal: 720, min: 480 }
-              }
-            : {
-                facingMode: "user",
-                width: { ideal: 1280, min: 640 },
-                height: { ideal: 720, min: 480 }
-              }
+          fps: isHD ? 25 : 15,
+          videoConstraints: isHD
+            ? ((selectedId && selectedId.trim() !== "")
+                ? {
+                    deviceId: { exact: selectedId },
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 720, min: 480 }
+                  }
+                : {
+                    facingMode: "user",
+                    width: { ideal: 1280, min: 640 },
+                    height: { ideal: 720, min: 480 }
+                  })
+            : ((selectedId && selectedId.trim() !== "")
+                ? { deviceId: { exact: selectedId } }
+                : { facingMode: "user" })
         };
 
         // Inicia a captura de vídeo e leitura contínua
@@ -1480,7 +1502,7 @@
             console.warn("Tentando iniciar câmera com configurações de fallback padrão...");
             const selectedId = preferredCameraId || cameraSelect.value;
             const simpleCamConfig = (selectedId && selectedId.trim() !== "") ? selectedId : { facingMode: "user" };
-            await html5QrCode.start(simpleCamConfig, { fps: 20 }, onQRCodeDetected, () => {});
+            await html5QrCode.start(simpleCamConfig, { fps: 15 }, onQRCodeDetected, () => {});
             isCameraRunning = true;
             camStatusBadge.className = "status-badge status-active";
             camStatusBadge.textContent = "● Câmera Ativa";
@@ -1520,6 +1542,17 @@
           console.warn("Aviso ao parar câmera:", err);
         }
       }
+
+      // Garante liberação completa de todas as tracks de mídia remanescentes
+      try {
+        const videoElem = document.querySelector("#qr-reader video");
+        if (videoElem && videoElem.srcObject) {
+          const tracks = videoElem.srcObject.getTracks ? videoElem.srcObject.getTracks() : [];
+          tracks.forEach(t => t.stop());
+          videoElem.srcObject = null;
+        }
+      } catch (_) {}
+
       isCameraRunning = false;
       camStatusBadge.className = "status-badge status-inactive";
       camStatusBadge.textContent = "● Inativa";
@@ -1534,6 +1567,64 @@
         startCamera();
       }
     }
+
+    // ALTERAR PERFIL DA CÂMERA (HD vs Padrão)
+    async function changeCameraProfile() {
+      if (!camProfileSelect) return;
+      currentCamProfile = camProfileSelect.value;
+      localStorage.setItem("crachas_cam_profile", currentCamProfile);
+
+      if (isCameraRunning) {
+        showToast(currentCamProfile === "hd" 
+          ? "Perfil ativado: ⚡ Alta Precisão (HD)" 
+          : "Perfil ativado: 🎥 Padrão (Reunião)", "info");
+        await startCamera();
+      } else {
+        showToast(currentCamProfile === "hd" 
+          ? "Perfil selecionado: ⚡ Alta Precisão (HD)" 
+          : "Perfil selecionado: 🎥 Padrão (Reunião)", "info");
+      }
+    }
+
+    // RESETAR CÂMERA AO MODO PADRÃO DO WINDOWS (Para liberar para reuniões / Teams / Meet)
+    async function resetCameraToDefault() {
+      if (camProfileSelect) {
+        camProfileSelect.value = "default";
+      }
+      currentCamProfile = "default";
+      localStorage.setItem("crachas_cam_profile", "default");
+
+      // 1. Encerra o leitor QR e cancela todos os fluxos
+      await stopCamera();
+
+      // 2. Abre brevemente um fluxo sem restrições e encerra imediatamente.
+      // Isso força o subsistema do Windows Media Foundation a desativar as resoluções
+      // customizadas e restaurar a configuração de fábrica da webcam, liberando-a para reuniões.
+      try {
+        const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
+        stream.getTracks().forEach(track => track.stop());
+      } catch (err) {
+        console.warn("Aviso ao executar reset de hardware:", err);
+      }
+
+      showToast("✓ Câmera resetada ao padrão e liberada para reuniões!", "success");
+    }
+
+    // Garante liberação da câmera ao fechar ou recarregar a aba
+    window.addEventListener('beforeunload', () => {
+      if (html5QrCode && isCameraRunning) {
+        try {
+          html5QrCode.stop();
+        } catch (_) {}
+      }
+      try {
+        const videoElem = document.querySelector("#qr-reader video");
+        if (videoElem && videoElem.srcObject) {
+          const tracks = videoElem.srcObject.getTracks ? videoElem.srcObject.getTracks() : [];
+          tracks.forEach(track => track.stop());
+        }
+      } catch (_) {}
+    });
 
     cameraSelect.addEventListener('change', () => {
       if (cameraSelect.value) {
@@ -2059,6 +2150,9 @@
 
     // INICIALIZAÇÃO
     window.addEventListener('DOMContentLoaded', async () => {
+      if (camProfileSelect) {
+        camProfileSelect.value = currentCamProfile;
+      }
       loadExtraInfoFromStorage();
       updateReportBadge();
       renderCardsTable();
