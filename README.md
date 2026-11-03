@@ -22,7 +22,11 @@ A página é **100% autônoma (HTML/JS nativo)**, sem necessidade de backend Pyt
 
 1. **Câmera:** Ao abrir a página no navegador, permita o acesso à câmera. O feed de vídeo será exibido ao vivo com a área de escaneamento.
 2. **Leitor RFID USB:** Clique no botão azul **"🔌 Conectar Leitor USB"** e selecione a porta serial do leitor (geralmente `Dispositivo Serial USB / COM3`).
-3. **Leitura e Associação (Fluxo 100% Automático):**
+3. **Perfis de Câmera & Reset para Reuniões:**
+   * **⚡ Alta Precisão (HD):** Ativado por padrão para escanear crachás com máxima velocidade e nitidez em 720p / 25 FPS.
+   * **🎥 Padrão (Reunião):** Usa as configurações nativas do driver sem forçar resoluções específicas.
+   * **🔄 Reset Padrão:** Botão de um clique que encerra a captura, redefine o perfil para "Padrão" e libera o hardware da webcam para apps como Microsoft Teams, Google Meet ou Zoom.
+4. **Leitura e Associação (Fluxo 100% Automático):**
    * Aproxime o **QR Code do crachá** na câmera: a matrícula e o nome do colaborador são preenchidos automaticamente.
    * Aproxime o **cartão no leitor RFID**: o código numérico é capturado.
    * **Confirmação Automática:** Com a opção **⚡ Auto-confirmar** ativa (ligada por padrão), assim que o QR e o RFID são lidos, o cartão é confirmado e gravado no topo da lista automaticamente, já limpando os campos e ficando pronto para o próximo crachá!
